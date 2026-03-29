@@ -89,7 +89,9 @@ describe('ProductsController (e2e)', () => {
 
   afterEach(async () => {
     if (dataSource) {
-      await dataSource.query('TRUNCATE TABLE "products"');
+      await dataSource.query(
+        'TRUNCATE TABLE "order_items", "orders", "products" RESTART IDENTITY CASCADE',
+      );
     }
   });
 
@@ -103,7 +105,7 @@ describe('ProductsController (e2e)', () => {
       .send({
         name: 'Wireless Mechanical Keyboard',
         priceAmount: 12999,
-        currency: 'USD',
+        currency: 'LKR',
         stockQuantity: 25,
       })
       .expect(401);
@@ -121,7 +123,7 @@ describe('ProductsController (e2e)', () => {
         name: 'Wireless Mechanical Keyboard',
         description: 'Compact keyboard with hot-swappable switches.',
         priceAmount: 12999,
-        currency: 'USD',
+        currency: 'LKR',
         stockQuantity: 25,
       })
       .expect(201);
@@ -132,7 +134,7 @@ describe('ProductsController (e2e)', () => {
       name: 'Wireless Mechanical Keyboard',
       description: 'Compact keyboard with hot-swappable switches.',
       priceAmount: 12999,
-      currency: 'USD',
+      currency: 'LKR',
       stockQuantity: 25,
       isActive: true,
     });
@@ -148,7 +150,7 @@ describe('ProductsController (e2e)', () => {
           .send({
             name: 'Wireless Mechanical Keyboard',
             priceAmount: 12999,
-            currency: 'USD',
+            currency: 'LKR',
             stockQuantity: 25,
           })
           .expect(201)
@@ -186,7 +188,7 @@ describe('ProductsController (e2e)', () => {
           .send({
             name: 'Wireless Mechanical Keyboard',
             priceAmount: 12999,
-            currency: 'USD',
+            currency: 'LKR',
             stockQuantity: 25,
           })
           .expect(201)

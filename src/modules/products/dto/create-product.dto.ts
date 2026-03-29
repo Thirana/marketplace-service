@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Equals,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -39,11 +40,13 @@ export class CreateProductDto {
   priceAmount!: number;
 
   @ApiProperty({
-    example: 'USD',
-    description: 'Three-letter ISO currency code.',
+    example: 'LKR',
+    description:
+      'Three-letter ISO currency code. The current assignment runtime assumes LKR.',
   })
   @IsString()
   @Matches(/^[A-Z]{3}$/)
+  @Equals('LKR')
   currency!: string;
 
   @ApiProperty({

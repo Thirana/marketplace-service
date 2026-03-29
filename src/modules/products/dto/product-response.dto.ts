@@ -23,7 +23,7 @@ export class ProductResponseDto {
   })
   priceAmount!: number;
 
-  @ApiProperty({ example: 'USD' })
+  @ApiProperty({ example: 'LKR' })
   currency!: string;
 
   @ApiProperty({ example: 25 })

@@ -2,7 +2,7 @@ import dataSource from '../typeorm.datasource';
 
 const DEMO_PRODUCTS_COUNT = 80;
 const DEMO_CREATED_AT_BASE = Date.parse('2026-01-01T12:00:00.000Z');
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'LKR'] as const;
+const DEMO_PRODUCT_CURRENCY = 'LKR' as const;
 const ADJECTIVES = [
   'Aurora',
   'Summit',
@@ -33,7 +33,7 @@ type DemoProductSeed = {
   name: string;
   description: string;
   priceAmount: number;
-  currency: (typeof CURRENCIES)[number];
+  currency: typeof DEMO_PRODUCT_CURRENCY;
   stockQuantity: number;
   isActive: boolean;
   createdAt: string;
@@ -50,7 +50,6 @@ const buildDemoProducts = (): DemoProductSeed[] =>
     const adjective = ADJECTIVES[index % ADJECTIVES.length];
     const productType =
       PRODUCT_TYPES[Math.floor(index / 2) % PRODUCT_TYPES.length];
-    const currency = CURRENCIES[index % CURRENCIES.length];
     const timestamp = new Date(
       DEMO_CREATED_AT_BASE - Math.floor(index / 2) * 60_000,
     ).toISOString();
@@ -60,7 +59,7 @@ const buildDemoProducts = (): DemoProductSeed[] =>
       name: `Demo Product ${sequence.toString().padStart(3, '0')} - ${adjective} ${productType}`,
       description: `Deterministic demo catalog entry ${sequence} for pagination walkthroughs and API review.`,
       priceAmount: 4_900 + sequence * 175,
-      currency,
+      currency: DEMO_PRODUCT_CURRENCY,
       stockQuantity: 5 + (index % 40),
       isActive: true,
       createdAt: timestamp,
@@ -125,7 +124,7 @@ const seedDemoProducts = async (): Promise<void> => {
 
       await queryRunner.commitTransaction();
       console.log(
-        `Seeded ${DEMO_PRODUCTS_COUNT} deterministic demo products for pagination testing.`,
+        `Seeded ${DEMO_PRODUCTS_COUNT} deterministic demo products in ${DEMO_PRODUCT_CURRENCY} for pagination testing.`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();

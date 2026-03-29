@@ -11,6 +11,8 @@ NestJS backend for a backend and platform engineering assessment. The project is
 - structured JSON logging with request IDs
 - centralized API exception handling
 - health endpoints for liveness and readiness
+- public order creation with transactional stock reduction
+- explicit money modeling with a single-currency runtime assumption of `LKR`
 
 ## Prerequisites
 
@@ -70,7 +72,21 @@ Swagger is available at `/docs` once the application is running.
 - `GET /products` returns the public product catalog using cursor pagination
 - `POST /products`, `PATCH /products/:id`, and `DELETE /products/:id` are admin-only and require `x-api-key`
 
-Both endpoints are intended to support local verification now and platform-style probes in later deployment work.
+## Order Endpoint
+
+- `POST /orders` creates a multi-item order and requires the `Idempotency-Key` header
+
+The order write path currently:
+
+- validates that every requested product exists and is active
+- rejects duplicate products in the same basket
+- rejects products that are not priced in `LKR`
+- snapshots line-item prices plus the aggregate order total
+- reduces stock for all items in the same transaction as order creation
+
+For this assignment, the runtime business assumption is a single-currency catalog in `LKR`. The `currency` field is still retained in the schema and API so monetary data remains explicit and future extension does not require a schema redesign.
+
+Full idempotent replay behavior is intentionally deferred to the next implementation phase.
 
 ## Demo Data
 
@@ -83,6 +99,7 @@ npm run seed:demo
 What it does:
 
 - upserts 80 deterministic active products
+- seeds all demo products in `LKR`
 - uses fixed UUIDs so seeded rows are stable across reruns
 - uses staggered timestamps, with repeated timestamp pairs, so cursor pagination and the `created_at DESC, id DESC` tie-breaker are easy to explain
 - does not touch non-demo products created manually through the API
@@ -97,12 +114,34 @@ Suggested pagination demo flow:
 6. Call `GET /products?limit=20`
 7. Copy the returned `pageInfo.nextCursor` into the next `GET /products` request
 
+Suggested order demo flow:
+
+1. `npm run db:up`
+2. `npm run migration:run`
+3. `npm run seed:demo`
+4. `npm run start:dev`
+5. Open Swagger at `http://localhost:3000/docs`
+6. Pick a seeded product ID from `GET /products`
+7. Call `POST /orders` with:
+   - header: `Idempotency-Key: demo-order-1`
+   - body:
+
+```json
+{
+  "items": [
+    { "productId": "<first-seeded-product-id>", "quantity": 1 },
+    { "productId": "<second-seeded-product-id>", "quantity": 2 }
+  ]
+}
+```
+
 ## Environment Notes
 
 - `DB_*` values are required and should point to the local Docker Postgres instance during development.
 - `ADMIN_API_KEY` is required now because later admin routes will depend on it.
 - Firebase configuration is optional as a group until the notifications phase.
 - Application code should read config through Nest config injection, not directly from `process.env`.
+- The current business assumption is a single-currency system using `LKR`, even though currency stays explicit in the schema and response DTOs.
 
 ## Commands
 

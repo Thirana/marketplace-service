@@ -90,7 +90,7 @@ describe('Products listing (e2e)', () => {
   afterEach(async () => {
     if (dataSource) {
       await dataSource.query(
-        'TRUNCATE TABLE "products" RESTART IDENTITY CASCADE',
+        'TRUNCATE TABLE "order_items", "orders", "products" RESTART IDENTITY CASCADE',
       );
     }
   });
@@ -211,7 +211,7 @@ describe('Products listing (e2e)', () => {
         name,
         description: `${name} description`,
         priceAmount: 1099,
-        currency: 'USD',
+        currency: 'LKR',
         stockQuantity: 5,
         isActive,
       }),
