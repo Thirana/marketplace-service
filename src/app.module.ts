@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { WinstonModule } from 'nest-winston';
 import { configFactories, validateEnv } from './config';
+import { loggingConfig } from './config';
+import { createWinstonOptions } from './common/logging/winston.config';
+import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -12,8 +15,12 @@ import { configFactories, validateEnv } from './config';
       validate: validateEnv,
       load: configFactories,
     }),
+    WinstonModule.forRootAsync({
+      inject: [loggingConfig.KEY],
+      useFactory: createWinstonOptions,
+    }),
+    DatabaseModule,
+    HealthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

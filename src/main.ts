@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { configureApp } from './app.setup';
 import { appConfig } from './config';
 
 const logger = new Logger('Bootstrap');
@@ -11,9 +12,13 @@ const logger = new Logger('Bootstrap');
  * the configured port.
  */
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = configureApp(
+    await NestFactory.create(AppModule, {
+      bufferLogs: true,
+    }),
+  );
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
-  app.enableShutdownHooks();
+
   await app.listen(config.port);
 }
 
