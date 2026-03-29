@@ -5,11 +5,17 @@ import { IsNull, Repository } from 'typeorm';
 import { Logger } from 'winston';
 import { CreateProductDto } from '../dto/create-product.dto';
 import {
+  DEFAULT_PRODUCTS_PAGE_SIZE,
+  ListProductsQueryDto,
+} from '../dto/list-products.query.dto';
+import { ListProductsResponseDto } from '../dto/list-products-response.dto';
+import {
   ProductResponseDto,
   toProductResponseDto,
 } from '../dto/product-response.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { Product } from '../entities/product.entity';
+import { decodeProductsCursor, encodeProductsCursor } from '../products.cursor';
 
 const PRODUCT_NOT_FOUND_ERROR_CODE = 'PRODUCT_NOT_FOUND';
 
@@ -22,6 +28,61 @@ export class ProductsService {
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Returns the public catalog view using a stable cursor over active,
+   * non-deleted products so continuation stays deterministic across pages.
+   */
+  async list(
+    listProductsQueryDto: ListProductsQueryDto,
+  ): Promise<ListProductsResponseDto> {
+    const limit = listProductsQueryDto.limit ?? DEFAULT_PRODUCTS_PAGE_SIZE;
+    const cursor = listProductsQueryDto.cursor
+      ? decodeProductsCursor(listProductsQueryDto.cursor)
+      : null;
+
+    const queryBuilder = this.productsRepository
+      .createQueryBuilder('product')
+      .where('product.deleted_at IS NULL')
+      .andWhere('product.is_active = :isActive', { isActive: true })
+      .orderBy('product.created_at', 'DESC')
+      .addOrderBy('product.id', 'DESC')
+      .take(limit + 1);
+
+    if (cursor) {
+      queryBuilder.andWhere(
+        '(product.created_at < :cursorCreatedAt OR (product.created_at = :cursorCreatedAt AND product.id < :cursorId))',
+        {
+          cursorCreatedAt: cursor.createdAt,
+          cursorId: cursor.id,
+        },
+      );
+    }
+
+    const products = await queryBuilder.getMany();
+    const hasNextPage = products.length > limit;
+    const items = hasNextPage ? products.slice(0, limit) : products;
+    const lastItem = items.at(-1);
+
+    return {
+      items: items.map(toProductResponseDto),
+      pageInfo: {
+        limit,
+        hasNextPage,
+        nextCursor:
+          hasNextPage && lastItem
+            ? encodeProductsCursor({
+                createdAt: lastItem.createdAt.toISOString(),
+                id: lastItem.id,
+              })
+            : null,
+      },
+    };
+  }
+
+  /**
+   * Persists a new product using explicit defaults for optional fields and
+   * emits a structured domain log for downstream operational visibility.
+   */
   async create(
     createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
@@ -42,6 +103,10 @@ export class ProductsService {
     return toProductResponseDto(savedProduct);
   }
 
+  /**
+   * Applies admin-supplied changes to an existing product while preserving the
+   * not-found guardrail for deleted catalog entries.
+   */
   async update(
     id: string,
     updateProductDto: UpdateProductDto,
@@ -60,6 +125,10 @@ export class ProductsService {
     return toProductResponseDto(updatedProduct);
   }
 
+  /**
+   * Soft-deletes a product so it disappears from public and admin mutation
+   * flows without immediately erasing row history needed by later phases.
+   */
   async remove(id: string): Promise<void> {
     const product = await this.findActiveProductOrThrow(id);
 

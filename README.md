@@ -44,7 +44,13 @@ npm run db:up
 npm run migration:run
 ```
 
-5. Start the API.
+5. Seed the demo catalog with 80 deterministic products.
+
+```bash
+npm run seed:demo
+```
+
+6. Start the API.
 
 ```bash
 npm run start:dev
@@ -59,7 +65,37 @@ Swagger is available at `/docs` once the application is running.
 - `GET /health/live` returns application liveness
 - `GET /health/ready` checks PostgreSQL readiness
 
+## Product Endpoints
+
+- `GET /products` returns the public product catalog using cursor pagination
+- `POST /products`, `PATCH /products/:id`, and `DELETE /products/:id` are admin-only and require `x-api-key`
+
 Both endpoints are intended to support local verification now and platform-style probes in later deployment work.
+
+## Demo Data
+
+Use the demo seed when you want an interview-friendly dataset for pagination walkthroughs.
+
+```bash
+npm run seed:demo
+```
+
+What it does:
+
+- upserts 80 deterministic active products
+- uses fixed UUIDs so seeded rows are stable across reruns
+- uses staggered timestamps, with repeated timestamp pairs, so cursor pagination and the `created_at DESC, id DESC` tie-breaker are easy to explain
+- does not touch non-demo products created manually through the API
+
+Suggested pagination demo flow:
+
+1. `npm run db:up`
+2. `npm run migration:run`
+3. `npm run seed:demo`
+4. `npm run start:dev`
+5. Open Swagger at `http://localhost:3000/docs`
+6. Call `GET /products?limit=20`
+7. Copy the returned `pageInfo.nextCursor` into the next `GET /products` request
 
 ## Environment Notes
 
@@ -77,6 +113,7 @@ Both endpoints are intended to support local verification now and platform-style
 - `npm run db:up`
 - `npm run db:down`
 - `npm run db:reset`
+- `npm run seed:demo`
 - `npm run migration:create --name=<migration-name>`
 - `npm run migration:generate --name=<migration-name>`
 - `npm run migration:run`
