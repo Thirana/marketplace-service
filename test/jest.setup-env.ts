@@ -1,0 +1,9 @@
+process.env.PORT ??= '3000';
+process.env.NODE_ENV ??= 'test';
+process.env.DB_HOST ??= 'localhost';
+process.env.DB_PORT ??= '5432';
+process.env.DB_USERNAME ??= 'postgres';
+process.env.DB_PASSWORD ??= 'postgres';
+process.env.DB_NAME ??= 'marketplace_service';
+process.env.LOG_LEVEL ??= 'info';
+process.env.ADMIN_API_KEY ??= 'test-admin-key';
