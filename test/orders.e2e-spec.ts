@@ -9,6 +9,7 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   MISSING_IDEMPOTENCY_KEY_ERROR_CODE,
 } from '../src/common/http/idempotency-key.constants';
+import { OrderIdempotencyKey } from '../src/modules/orders/entities/order-idempotency-key.entity';
 import { OrderItem } from '../src/modules/orders/entities/order-item.entity';
 import { Order } from '../src/modules/orders/entities/order.entity';
 import { Product } from '../src/modules/products/entities/product.entity';
@@ -96,6 +97,9 @@ describe('OrdersController (e2e)', () => {
   let productsRepository: Repository<Product> | undefined;
   let ordersRepository: Repository<Order> | undefined;
   let orderItemsRepository: Repository<OrderItem> | undefined;
+  let orderIdempotencyKeysRepository:
+    | Repository<OrderIdempotencyKey>
+    | undefined;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -110,12 +114,14 @@ describe('OrdersController (e2e)', () => {
     productsRepository = dataSource.getRepository(Product);
     ordersRepository = dataSource.getRepository(Order);
     orderItemsRepository = dataSource.getRepository(OrderItem);
+    orderIdempotencyKeysRepository =
+      dataSource.getRepository(OrderIdempotencyKey);
   });
 
   afterEach(async () => {
     if (dataSource) {
       await dataSource.query(
-        'TRUNCATE TABLE "order_items", "orders", "products" RESTART IDENTITY CASCADE',
+        'TRUNCATE TABLE "order_idempotency_keys", "order_items", "orders", "products" RESTART IDENTITY CASCADE',
       );
     }
   });
@@ -289,29 +295,31 @@ describe('OrdersController (e2e)', () => {
     expect(body.totalPriceAmount).toBe(82994);
     expect(body.currency).toBe('LKR');
     expect(body.items).toHaveLength(3);
-    expect(body.items).toMatchObject([
-      {
-        productId: firstProduct.id,
-        quantity: 2,
-        unitPriceAmount: 12999,
-        lineTotalAmount: 25998,
-        currency: 'LKR',
-      },
-      {
-        productId: secondProduct.id,
-        quantity: 1,
-        unitPriceAmount: 8999,
-        lineTotalAmount: 8999,
-        currency: 'LKR',
-      },
-      {
-        productId: thirdProduct.id,
-        quantity: 3,
-        unitPriceAmount: 15999,
-        lineTotalAmount: 47997,
-        currency: 'LKR',
-      },
-    ]);
+    expect(body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          productId: firstProduct.id,
+          quantity: 2,
+          unitPriceAmount: 12999,
+          lineTotalAmount: 25998,
+          currency: 'LKR',
+        }),
+        expect.objectContaining({
+          productId: secondProduct.id,
+          quantity: 1,
+          unitPriceAmount: 8999,
+          lineTotalAmount: 8999,
+          currency: 'LKR',
+        }),
+        expect.objectContaining({
+          productId: thirdProduct.id,
+          quantity: 3,
+          unitPriceAmount: 15999,
+          lineTotalAmount: 47997,
+          currency: 'LKR',
+        }),
+      ]),
+    );
     expect(persistedOrder.idempotencyKey).toBe('create-order-success');
     expect(persistedOrder.totalPriceAmount).toBe(82994);
     expect(persistedOrder.currency).toBe('LKR');
@@ -319,6 +327,149 @@ describe('OrdersController (e2e)', () => {
     expect(updatedFirstProduct.stockQuantity).toBe(3);
     expect(updatedSecondProduct.stockQuantity).toBe(3);
     expect(updatedThirdProduct.stockQuantity).toBe(4);
+  });
+
+  it('replays the original order when the same idempotency key and basket are retried', async () => {
+    const firstProduct = await seedProduct({
+      name: 'Replay Product A',
+      priceAmount: 12999,
+      stockQuantity: 5,
+    });
+    const secondProduct = await seedProduct({
+      name: 'Replay Product B',
+      priceAmount: 8999,
+      stockQuantity: 4,
+    });
+
+    const firstResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
+      .send({
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(201);
+
+    const replayResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
+      .send({
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(201);
+
+    const firstBody = parseOrderResponseBody(firstResponse.body);
+    const replayBody = parseOrderResponseBody(replayResponse.body);
+    const updatedFirstProduct = await productsRepository!.findOneByOrFail({
+      id: firstProduct.id,
+    });
+    const updatedSecondProduct = await productsRepository!.findOneByOrFail({
+      id: secondProduct.id,
+    });
+
+    expect(replayBody).toEqual(firstBody);
+    expect(await ordersRepository!.count()).toBe(1);
+    expect(await orderItemsRepository!.count()).toBe(2);
+    expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(updatedFirstProduct.stockQuantity).toBe(4);
+    expect(updatedSecondProduct.stockQuantity).toBe(2);
+  });
+
+  it('replays the original order when the same basket is retried in a different item order', async () => {
+    const firstProduct = await seedProduct({
+      name: 'Canonical Product A',
+      priceAmount: 12999,
+      stockQuantity: 5,
+    });
+    const secondProduct = await seedProduct({
+      name: 'Canonical Product B',
+      priceAmount: 8999,
+      stockQuantity: 4,
+    });
+
+    const firstResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
+      .send({
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(201);
+
+    const replayResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
+      .send({
+        items: [
+          { productId: secondProduct.id, quantity: 2 },
+          { productId: firstProduct.id, quantity: 1 },
+        ],
+      })
+      .expect(201);
+
+    expect(parseOrderResponseBody(replayResponse.body)).toEqual(
+      parseOrderResponseBody(firstResponse.body),
+    );
+    expect(await ordersRepository!.count()).toBe(1);
+    expect(await orderItemsRepository!.count()).toBe(2);
+    expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+  });
+
+  it('rejects a reused idempotency key when the basket changes', async () => {
+    const firstProduct = await seedProduct({
+      name: 'Conflict Product A',
+      priceAmount: 12999,
+      stockQuantity: 5,
+    });
+    const secondProduct = await seedProduct({
+      name: 'Conflict Product B',
+      priceAmount: 8999,
+      stockQuantity: 4,
+    });
+
+    await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
+      .send({
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(201);
+
+    const conflictResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
+      .send({
+        items: [
+          { productId: firstProduct.id, quantity: 2 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(409);
+
+    const body = parseErrorResponseBody(conflictResponse.body);
+    const updatedFirstProduct = await productsRepository!.findOneByOrFail({
+      id: firstProduct.id,
+    });
+    const updatedSecondProduct = await productsRepository!.findOneByOrFail({
+      id: secondProduct.id,
+    });
+
+    expect(body.errorCode).toBe('IDEMPOTENCY_REQUEST_CONFLICT');
+    expect(await ordersRepository!.count()).toBe(1);
+    expect(await orderItemsRepository!.count()).toBe(2);
+    expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(updatedFirstProduct.stockQuantity).toBe(4);
+    expect(updatedSecondProduct.stockQuantity).toBe(2);
   });
 
   /**

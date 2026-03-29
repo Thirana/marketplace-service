@@ -90,7 +90,7 @@ describe('ProductsController (e2e)', () => {
   afterEach(async () => {
     if (dataSource) {
       await dataSource.query(
-        'TRUNCATE TABLE "order_items", "orders", "products" RESTART IDENTITY CASCADE',
+        'TRUNCATE TABLE "order_idempotency_keys", "order_items", "orders", "products" RESTART IDENTITY CASCADE',
       );
     }
   });

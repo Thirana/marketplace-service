@@ -1,19 +1,27 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
+import { Logger } from 'winston';
+import { Product } from '../../products/entities/product.entity';
 import { CreateOrderDto, CreateOrderItemDto } from '../dto/create-order.dto';
 import {
   OrderResponseDto,
   toOrderResponseDto,
 } from '../dto/order-response.dto';
+import {
+  OrderIdempotencyKey,
+  OrderIdempotencyStatus,
+} from '../entities/order-idempotency-key.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Order } from '../entities/order.entity';
-import { Product } from '../../products/entities/product.entity';
+import { createOrderRequestFingerprint } from '../order-fingerprint';
 
 const SUPPORTED_ORDER_CURRENCY = 'LKR';
 
@@ -22,6 +30,9 @@ const PRODUCT_NOT_AVAILABLE_ERROR_CODE = 'PRODUCT_NOT_AVAILABLE';
 const DUPLICATE_ORDER_PRODUCT_ERROR_CODE = 'DUPLICATE_ORDER_PRODUCT';
 const INSUFFICIENT_PRODUCT_STOCK_ERROR_CODE = 'INSUFFICIENT_PRODUCT_STOCK';
 const UNSUPPORTED_PRODUCT_CURRENCY_ERROR_CODE = 'UNSUPPORTED_PRODUCT_CURRENCY';
+const IDEMPOTENCY_REQUEST_CONFLICT_ERROR_CODE = 'IDEMPOTENCY_REQUEST_CONFLICT';
+const IDEMPOTENCY_KEY_UNIQUE_CONSTRAINT =
+  'UQ_order_idempotency_keys_idempotency_key';
 
 type PreparedOrderItemDraft = {
   product: Product;
@@ -35,71 +46,145 @@ export class OrdersService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    @Inject(WINSTON_MODULE_PROVIDER)
+    private readonly logger: Logger,
   ) {}
 
   /**
-   * Creates a multi-item order inside a single transaction so basket
-   * validation, stock deduction, and persisted totals remain consistent.
+   * Creates a multi-item order inside a single transaction and upgrades the
+   * flow with DB-backed idempotency so safe retries return a stable result.
    */
   async create(
     idempotencyKey: string,
     createOrderDto: CreateOrderDto,
   ): Promise<OrderResponseDto> {
-    const order = await this.dataSource.transaction(async (manager) => {
-      this.assertUniqueOrderItems(createOrderDto.items);
+    const requestFingerprint = createOrderRequestFingerprint(createOrderDto);
 
-      const productsById = await this.loadProductsForOrderingOrThrow(
-        manager,
-        createOrderDto.items,
-      );
-      const preparedOrderItems = this.prepareOrderItems(
-        createOrderDto.items,
-        productsById,
-      );
-
-      const totalPriceAmount = preparedOrderItems.reduce(
-        (sum, orderItem) => sum + orderItem.lineTotalAmount,
-        0,
-      );
-
-      const savedOrder = await manager.getRepository(Order).save(
-        manager.getRepository(Order).create({
+    try {
+      const order = await this.dataSource.transaction(async (manager) => {
+        const idempotencyRecord = await this.createIdempotencyRecord(
+          manager,
           idempotencyKey,
-          totalPriceAmount,
-          currency: SUPPORTED_ORDER_CURRENCY,
-        }),
-      );
-
-      const productsRepository = manager.getRepository(Product);
-      const orderItemsRepository = manager.getRepository(OrderItem);
-
-      for (const orderItem of preparedOrderItems) {
-        await productsRepository.save(orderItem.product);
-      }
-
-      const savedOrderItems: OrderItem[] = [];
-
-      for (const orderItem of preparedOrderItems) {
-        savedOrderItems.push(
-          await orderItemsRepository.save(
-            orderItemsRepository.create({
-              orderId: savedOrder.id,
-              productId: orderItem.product.id,
-              quantity: orderItem.quantity,
-              unitPriceAmount: orderItem.unitPriceAmount,
-              lineTotalAmount: orderItem.lineTotalAmount,
-              currency: SUPPORTED_ORDER_CURRENCY,
-            }),
-          ),
+          requestFingerprint,
         );
+        const createdOrder = await this.createNewOrder(
+          manager,
+          idempotencyKey,
+          createOrderDto,
+        );
+
+        idempotencyRecord.orderId = createdOrder.id;
+        idempotencyRecord.status = OrderIdempotencyStatus.COMPLETED;
+        await manager
+          .getRepository(OrderIdempotencyKey)
+          .save(idempotencyRecord);
+
+        return createdOrder;
+      });
+
+      this.logger.info({
+        event: 'order.created',
+        orderId: order.id,
+        itemsCount: order.items.length,
+        totalPriceAmount: order.totalPriceAmount,
+        currency: order.currency,
+      });
+
+      return toOrderResponseDto(order);
+    } catch (error) {
+      if (!this.isIdempotencyKeyUniqueViolation(error)) {
+        throw error;
       }
 
-      return Object.assign(savedOrder, {
-        items: savedOrderItems,
-      });
-    });
+      return this.replayExistingOrderOrThrow(
+        idempotencyKey,
+        requestFingerprint,
+      );
+    }
+  }
 
-    return toOrderResponseDto(order);
+  /**
+   * Reserves the idempotency key at the start of the transaction so duplicate
+   * retries block on the unique constraint instead of creating extra orders.
+   */
+  private async createIdempotencyRecord(
+    manager: EntityManager,
+    idempotencyKey: string,
+    requestFingerprint: string,
+  ): Promise<OrderIdempotencyKey> {
+    const idempotencyRepository = manager.getRepository(OrderIdempotencyKey);
+
+    return idempotencyRepository.save(
+      idempotencyRepository.create({
+        idempotencyKey,
+        requestFingerprint,
+        status: OrderIdempotencyStatus.IN_PROGRESS,
+        responseStatusCode: 201,
+        orderId: null,
+      }),
+    );
+  }
+
+  /**
+   * Builds and persists the order aggregate once the idempotency key has been
+   * reserved successfully inside the surrounding transaction.
+   */
+  private async createNewOrder(
+    manager: EntityManager,
+    idempotencyKey: string,
+    createOrderDto: CreateOrderDto,
+  ): Promise<Order> {
+    this.assertUniqueOrderItems(createOrderDto.items);
+
+    const productsById = await this.loadProductsForOrderingOrThrow(
+      manager,
+      createOrderDto.items,
+    );
+    const preparedOrderItems = this.prepareOrderItems(
+      createOrderDto.items,
+      productsById,
+    );
+
+    const totalPriceAmount = preparedOrderItems.reduce(
+      (sum, orderItem) => sum + orderItem.lineTotalAmount,
+      0,
+    );
+
+    const savedOrder = await manager.getRepository(Order).save(
+      manager.getRepository(Order).create({
+        idempotencyKey,
+        totalPriceAmount,
+        currency: SUPPORTED_ORDER_CURRENCY,
+      }),
+    );
+
+    const productsRepository = manager.getRepository(Product);
+    const orderItemsRepository = manager.getRepository(OrderItem);
+
+    for (const orderItem of preparedOrderItems) {
+      await productsRepository.save(orderItem.product);
+    }
+
+    const savedOrderItems: OrderItem[] = [];
+
+    for (const orderItem of preparedOrderItems) {
+      savedOrderItems.push(
+        await orderItemsRepository.save(
+          orderItemsRepository.create({
+            orderId: savedOrder.id,
+            productId: orderItem.product.id,
+            quantity: orderItem.quantity,
+            unitPriceAmount: orderItem.unitPriceAmount,
+            lineTotalAmount: orderItem.lineTotalAmount,
+            currency: SUPPORTED_ORDER_CURRENCY,
+          }),
+        ),
+      );
+    }
+
+    return Object.assign(savedOrder, {
+      items: savedOrderItems,
+    });
   }
 
   /**
@@ -207,5 +292,82 @@ export class OrdersService {
         lineTotalAmount: product.priceAmount * orderItem.quantity,
       };
     });
+  }
+
+  /**
+   * Resolves duplicate idempotency-key submissions by replaying the original
+   * successful order when the fingerprint matches, or rejecting mismatches.
+   */
+  private async replayExistingOrderOrThrow(
+    idempotencyKey: string,
+    requestFingerprint: string,
+  ): Promise<OrderResponseDto> {
+    const idempotencyRecord = await this.dataSource
+      .getRepository(OrderIdempotencyKey)
+      .findOneBy({ idempotencyKey });
+
+    if (!idempotencyRecord) {
+      throw new ConflictException({
+        message: 'Idempotent order request could not be replayed safely.',
+        errorCode: IDEMPOTENCY_REQUEST_CONFLICT_ERROR_CODE,
+      });
+    }
+
+    if (idempotencyRecord.requestFingerprint !== requestFingerprint) {
+      throw new ConflictException({
+        message:
+          'Idempotency-Key has already been used for a different order request.',
+        errorCode: IDEMPOTENCY_REQUEST_CONFLICT_ERROR_CODE,
+      });
+    }
+
+    if (!idempotencyRecord.orderId) {
+      throw new ConflictException({
+        message: 'Idempotent order request is not ready for replay yet.',
+        errorCode: IDEMPOTENCY_REQUEST_CONFLICT_ERROR_CODE,
+      });
+    }
+
+    const order = await this.dataSource
+      .getRepository(Order)
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.items', 'orderItem')
+      .where('order.id = :orderId', { orderId: idempotencyRecord.orderId })
+      .orderBy('orderItem.created_at', 'ASC')
+      .addOrderBy('orderItem.id', 'ASC')
+      .getOne();
+
+    if (!order) {
+      throw new NotFoundException({
+        message: `Order ${idempotencyRecord.orderId} not found for replay.`,
+        errorCode: PRODUCT_NOT_FOUND_ERROR_CODE,
+      });
+    }
+
+    this.logger.info({
+      event: 'order.idempotent_replay',
+      orderId: order.id,
+      itemsCount: order.items.length,
+      totalPriceAmount: order.totalPriceAmount,
+      currency: order.currency,
+    });
+
+    return toOrderResponseDto(order);
+  }
+
+  private isIdempotencyKeyUniqueViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as {
+      code?: string;
+      constraint?: string;
+    };
+
+    return (
+      driverError.code === '23505' &&
+      driverError.constraint === IDEMPOTENCY_KEY_UNIQUE_CONSTRAINT
+    );
   }
 }

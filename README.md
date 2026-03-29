@@ -83,6 +83,8 @@ The order write path currently:
 - rejects products that are not priced in `LKR`
 - snapshots line-item prices plus the aggregate order total
 - reduces stock for all items in the same transaction as order creation
+- replays the original successful result when the same `Idempotency-Key` is retried with the same logical basket
+- rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket
 
 For this assignment, the runtime business assumption is a single-currency catalog in `LKR`. The `currency` field is still retained in the schema and API so monetary data remains explicit and future extension does not require a schema redesign.
 
@@ -134,6 +136,8 @@ Suggested order demo flow:
   ]
 }
 ```
+
+8. Repeat the same `POST /orders` request with the same `Idempotency-Key` to verify replay behavior.
 
 ## Environment Notes
 

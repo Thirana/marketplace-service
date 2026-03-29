@@ -72,7 +72,11 @@ const toOrderItemResponseDto = (
 
 export const toOrderResponseDto = (order: Order): OrderResponseDto => ({
   id: order.id,
-  items: order.items?.map(toOrderItemResponseDto) ?? [],
+  items:
+    order.items
+      ?.slice()
+      .sort((left, right) => left.productId.localeCompare(right.productId))
+      .map(toOrderItemResponseDto) ?? [],
   totalPriceAmount: order.totalPriceAmount,
   currency: order.currency,
   createdAt: order.createdAt.toISOString(),
