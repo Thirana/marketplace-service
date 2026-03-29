@@ -6,6 +6,7 @@ import { loggingConfig } from './config';
 import { createWinstonOptions } from './common/logging/winston.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './modules/health/health.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
     DatabaseModule,
     HealthModule,
+    ProductsModule,
   ],
 })
 export class AppModule {}

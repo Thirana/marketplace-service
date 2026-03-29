@@ -1,0 +1,2 @@
+export const ADMIN_API_KEY_HEADER = 'x-api-key';
+export const INVALID_ADMIN_API_KEY_ERROR_CODE = 'INVALID_ADMIN_API_KEY';

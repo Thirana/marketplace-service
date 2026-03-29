@@ -4,44 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { configureApp } from './../src/app.setup';
 import { AppModule } from './../src/app.module';
-
-type ErrorResponseBody = {
-  statusCode: number;
-  errorCode: string;
-  requestId: string;
-  timestamp: string;
-};
-
-/**
- * Narrows the generic supertest body into the standardized API error shape so
- * the e2e assertions stay type-safe and document the contract under test.
- */
-const parseErrorResponseBody = (body: unknown): ErrorResponseBody => {
-  if (typeof body !== 'object' || body === null) {
-    throw new Error('Expected an object error response body.');
-  }
-
-  const { statusCode, errorCode, requestId, timestamp } = body as Record<
-    string,
-    unknown
-  >;
-
-  if (
-    typeof statusCode !== 'number' ||
-    typeof errorCode !== 'string' ||
-    typeof requestId !== 'string' ||
-    typeof timestamp !== 'string'
-  ) {
-    throw new Error('Error response body is missing required fields.');
-  }
-
-  return {
-    statusCode,
-    errorCode,
-    requestId,
-    timestamp,
-  };
-};
+import { parseErrorResponseBody } from './support/http-response.helpers';
 
 describe('HealthController (e2e)', () => {
   let app: INestApplication<App> | undefined;

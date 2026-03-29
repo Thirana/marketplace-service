@@ -52,6 +52,8 @@ npm run start:dev
 
 The default local database values in `.env.example` match `compose.yaml`.
 
+Swagger is available at `/docs` once the application is running.
+
 ## Health Endpoints
 
 - `GET /health/live` returns application liveness

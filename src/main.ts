@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
 import { appConfig } from './config';
+import { configureSwagger } from './swagger.setup';
 
 const logger = new Logger('Bootstrap');
 
@@ -19,6 +20,7 @@ async function bootstrap() {
   );
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
 
+  configureSwagger(app);
   await app.listen(config.port);
 }
 
