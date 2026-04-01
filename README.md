@@ -86,6 +86,7 @@ The order write path currently:
 - snapshots line-item prices plus the aggregate order total
 - reduces stock for all items in the same transaction as order creation
 - persists a `PENDING` notification intent in the same transaction as order creation
+- schedules Firebase delivery after commit so the notification later transitions to `SENT` or `FAILED`
 - replays the original successful result when the same `Idempotency-Key` is retried with the same effective request
 - rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket or a different `customerDeviceToken`
 
@@ -96,6 +97,7 @@ For this assignment, the runtime business assumption is a single-currency catalo
 - `GET /orders/:id/notifications` returns persisted notifications for an order
 - this endpoint is admin-only and requires `x-api-key`
 - the response includes notification status and a masked preview of the target device token
+- `providerMessageId`, `sentAt`, `failedAt`, and `failureReason` reflect the Firebase delivery outcome once the async attempt finishes
 
 ## Demo Data
 
@@ -146,13 +148,13 @@ Suggested order demo flow:
 ```
 
 8. Repeat the same `POST /orders` request with the same `Idempotency-Key` to verify replay behavior.
-9. Call `GET /orders/<created-order-id>/notifications` with `x-api-key` to inspect the persisted notification intent.
+9. Call `GET /orders/<created-order-id>/notifications` with `x-api-key` to inspect the persisted notification record and final delivery status.
 
 ## Environment Notes
 
 - `DB_*` values are required and should point to the local Docker Postgres instance during development.
 - `ADMIN_API_KEY` is required now because later admin routes will depend on it.
-- Firebase configuration is optional as a group until the notifications phase.
+- Firebase configuration is optional as a group for local startup, but notification delivery will move records to `FAILED` until real credentials are provided.
 - Application code should read config through Nest config injection, not directly from `process.env`.
 - The current business assumption is a single-currency system using `LKR`, even though currency stays explicit in the schema and response DTOs.
 - For this backend-only assignment, the order request carries `customerDeviceToken` because there is no separate user/profile device registration flow.

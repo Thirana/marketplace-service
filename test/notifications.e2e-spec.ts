@@ -9,7 +9,10 @@ import {
   ADMIN_API_KEY_HEADER,
   INVALID_ADMIN_API_KEY_ERROR_CODE,
 } from '../src/common/auth/admin-api-key.constants';
-import { Notification } from '../src/modules/notifications/entities/notification.entity';
+import {
+  Notification,
+  NotificationStatus,
+} from '../src/modules/notifications/entities/notification.entity';
 import { Product } from '../src/modules/products/entities/product.entity';
 import { parseErrorResponseBody } from './support/http-response.helpers';
 
@@ -134,10 +137,12 @@ describe('NotificationsController (e2e)', () => {
     app = configureApp(moduleFixture.createNestApplication());
     await app.init();
 
-    dataSource = app.get(DataSource);
-    await dataSource.runMigrations();
-    productsRepository = dataSource.getRepository(Product);
-    notificationsRepository = dataSource.getRepository(Notification);
+    const configuredDataSource = app.get(DataSource);
+
+    await configuredDataSource.runMigrations();
+    dataSource = configuredDataSource;
+    productsRepository = configuredDataSource.getRepository(Product);
+    notificationsRepository = configuredDataSource.getRepository(Notification);
   });
 
   afterEach(async () => {
@@ -152,7 +157,7 @@ describe('NotificationsController (e2e)', () => {
     await app?.close();
   });
 
-  it('persists a pending notification intent when an order is created', async () => {
+  it('keeps order creation successful while failed Firebase delivery is tracked asynchronously', async () => {
     const product = await seedProduct({
       name: 'Notification Order Product',
       priceAmount: 12999,
@@ -168,21 +173,23 @@ describe('NotificationsController (e2e)', () => {
       })
       .expect(201);
 
-    const notifications = await notificationsRepository!.find();
+    const orderId = parseOrderId(orderResponse.body);
+    const notification = await waitForNotificationStatus(
+      orderId,
+      NotificationStatus.FAILED,
+    );
 
-    expect(notifications).toHaveLength(1);
-    expect(notifications[0]).toMatchObject({
-      orderId: parseOrderId(orderResponse.body),
-      type: 'ORDER_CREATED',
-      status: 'PENDING',
-      targetDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
-      title: 'Order confirmed',
-      providerMessageId: null,
-      failureReason: null,
-      sentAt: null,
-      failedAt: null,
-    });
-    expect(notifications[0].body).toContain(notifications[0].orderId);
+    expect(notification.orderId).toBe(orderId);
+    expect(notification.type).toBe('ORDER_CREATED');
+    expect(notification.status).toBe('FAILED');
+    expect(notification.targetDeviceToken).toBe(DEFAULT_CUSTOMER_DEVICE_TOKEN);
+    expect(notification.title).toBe('Order confirmed');
+    expect(notification.providerMessageId).toBeNull();
+    expect(notification.failureReason).toEqual(expect.any(String));
+    expect(notification.failureReason).not.toHaveLength(0);
+    expect(notification.sentAt).toBeNull();
+    expect(notification.failedAt).toEqual(expect.any(Date));
+    expect(notification.body).toContain(notification.orderId);
   });
 
   it('lists persisted notifications for an order with an admin API key', async () => {
@@ -202,6 +209,7 @@ describe('NotificationsController (e2e)', () => {
       .expect(201);
 
     const orderId = parseOrderId(orderResponse.body);
+    await waitForNotificationStatus(orderId, NotificationStatus.FAILED);
     const response = await request(app!.getHttpServer())
       .get(`/orders/${orderId}/notifications`)
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
@@ -210,19 +218,18 @@ describe('NotificationsController (e2e)', () => {
     const body = parseNotificationsResponseBody(response.body);
 
     expect(body).toHaveLength(1);
-    expect(body[0]).toMatchObject({
-      orderId,
-      type: 'ORDER_CREATED',
-      status: 'PENDING',
-      targetDeviceTokenPreview: createDeviceTokenPreview(
-        DEFAULT_CUSTOMER_DEVICE_TOKEN,
-      ),
-      title: 'Order confirmed',
-      providerMessageId: null,
-      failureReason: null,
-      sentAt: null,
-      failedAt: null,
-    });
+    expect(body[0].orderId).toBe(orderId);
+    expect(body[0].type).toBe('ORDER_CREATED');
+    expect(body[0].status).toBe('FAILED');
+    expect(body[0].targetDeviceTokenPreview).toBe(
+      createDeviceTokenPreview(DEFAULT_CUSTOMER_DEVICE_TOKEN),
+    );
+    expect(body[0].title).toBe('Order confirmed');
+    expect(body[0].providerMessageId).toBeNull();
+    expect(body[0].failureReason).toEqual(expect.any(String));
+    expect(body[0].failureReason).not.toHaveLength(0);
+    expect(body[0].sentAt).toBeNull();
+    expect(body[0].failedAt).toEqual(expect.any(String));
     expect(body[0].body).toContain(orderId);
   });
 
@@ -283,5 +290,30 @@ describe('NotificationsController (e2e)', () => {
     }
 
     return id;
+  }
+
+  /**
+   * Polls the persisted notification row so the e2e suite can assert the
+   * eventual Phase 08 status transition without depending on provider timing.
+   */
+  async function waitForNotificationStatus(
+    orderId: string,
+    expectedStatus: NotificationStatus,
+  ): Promise<Notification> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const notification = await notificationsRepository!.findOne({
+        where: { orderId },
+      });
+
+      if (notification?.status === expectedStatus) {
+        return notification;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    throw new Error(
+      `Notification for order ${orderId} did not reach status ${expectedStatus}.`,
+    );
   }
 });

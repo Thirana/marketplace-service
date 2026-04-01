@@ -60,8 +60,8 @@ export class OrdersService {
 
   /**
    * Creates a multi-item order inside a single transaction, persists a pending
-   * notification intent, and upgrades the flow with DB-backed idempotency so
-   * safe retries return a stable result.
+   * notification intent, schedules delivery after commit, and upgrades the
+   * flow with DB-backed idempotency so safe retries return a stable result.
    */
   async create(
     idempotencyKey: string,
@@ -116,6 +116,7 @@ export class OrdersService {
         type: notification.type,
         status: notification.status,
       });
+      this.notificationsService.scheduleDelivery(notification.id);
 
       return toOrderResponseDto(order);
     } catch (error) {
