@@ -75,20 +75,20 @@ Swagger is available at `/docs` once the application is running.
 ## Order Endpoint
 
 - `POST /orders` creates a multi-item order and requires the `Idempotency-Key` header
+- `POST /orders` also requires `customerDeviceToken` in the request body so later notification phases have an explicit FCM delivery target
 
 The order write path currently:
 
 - validates that every requested product exists and is active
 - rejects duplicate products in the same basket
 - rejects products that are not priced in `LKR`
+- requires a non-empty `customerDeviceToken`
 - snapshots line-item prices plus the aggregate order total
 - reduces stock for all items in the same transaction as order creation
-- replays the original successful result when the same `Idempotency-Key` is retried with the same logical basket
-- rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket
+- replays the original successful result when the same `Idempotency-Key` is retried with the same effective request
+- rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket or a different `customerDeviceToken`
 
 For this assignment, the runtime business assumption is a single-currency catalog in `LKR`. The `currency` field is still retained in the schema and API so monetary data remains explicit and future extension does not require a schema redesign.
-
-Full idempotent replay behavior is intentionally deferred to the next implementation phase.
 
 ## Demo Data
 
@@ -130,6 +130,7 @@ Suggested order demo flow:
 
 ```json
 {
+  "customerDeviceToken": "<fcm-registration-token-from-test-client>",
   "items": [
     { "productId": "<first-seeded-product-id>", "quantity": 1 },
     { "productId": "<second-seeded-product-id>", "quantity": 2 }
@@ -146,6 +147,7 @@ Suggested order demo flow:
 - Firebase configuration is optional as a group until the notifications phase.
 - Application code should read config through Nest config injection, not directly from `process.env`.
 - The current business assumption is a single-currency system using `LKR`, even though currency stays explicit in the schema and response DTOs.
+- For this backend-only assignment, the order request carries `customerDeviceToken` because there is no separate user/profile device registration flow.
 
 ## Commands
 

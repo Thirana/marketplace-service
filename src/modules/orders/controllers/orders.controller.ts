@@ -36,7 +36,7 @@ export class OrdersController {
   @ApiNotFoundResponse({ description: 'Product not found.' })
   @ApiConflictResponse({
     description:
-      'A requested product is unavailable, not priced in LKR, does not have enough stock, or the idempotency key was reused for a different basket.',
+      'A requested product is unavailable, not priced in LKR, does not have enough stock, or the idempotency key was reused for a different effective order request.',
   })
   async create(
     @IdempotencyKey() idempotencyKey: string,

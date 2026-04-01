@@ -32,6 +32,8 @@ type OrderResponseBody = {
   createdAt: string;
 };
 
+const DEFAULT_CUSTOMER_DEVICE_TOKEN = 'fcm-registration-token-test-device-001';
+
 /**
  * Narrows the public order creation response so the tests assert the explicit
  * basket contract rather than depending on untyped response bodies.
@@ -136,6 +138,7 @@ describe('OrdersController (e2e)', () => {
     const response = await request(app!.getHttpServer())
       .post('/orders')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [{ productId: product.id, quantity: 1 }],
       })
       .expect(400);
@@ -150,7 +153,24 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'empty-basket-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [],
+      })
+      .expect(400);
+
+    const body = parseErrorResponseBody(response.body);
+
+    expect(body.statusCode).toBe(400);
+  });
+
+  it('rejects order creation without a customer device token', async () => {
+    const product = await seedProduct();
+
+    const response = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'missing-device-token-check')
+      .send({
+        items: [{ productId: product.id, quantity: 1 }],
       })
       .expect(400);
 
@@ -166,6 +186,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'duplicate-product-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: product.id, quantity: 1 },
           { productId: product.id, quantity: 2 },
@@ -183,6 +204,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'missing-product-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           {
             productId: '8c9f7e84-26b9-4d81-9e54-15e1d0f4d91f',
@@ -204,6 +226,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'inactive-product-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [{ productId: product.id, quantity: 1 }],
       })
       .expect(409);
@@ -220,6 +243,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'unsupported-currency-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [{ productId: product.id, quantity: 1 }],
       })
       .expect(409);
@@ -236,6 +260,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'stock-check')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [{ productId: product.id, quantity: 3 }],
       })
       .expect(409);
@@ -266,6 +291,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'create-order-success')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 2 },
           { productId: secondProduct.id, quantity: 1 },
@@ -345,6 +371,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 1 },
           { productId: secondProduct.id, quantity: 2 },
@@ -356,6 +383,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 1 },
           { productId: secondProduct.id, quantity: 2 },
@@ -396,6 +424,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 1 },
           { productId: secondProduct.id, quantity: 2 },
@@ -407,6 +436,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: secondProduct.id, quantity: 2 },
           { productId: firstProduct.id, quantity: 1 },
@@ -438,6 +468,7 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 1 },
           { productId: secondProduct.id, quantity: 2 },
@@ -449,8 +480,61 @@ describe('OrdersController (e2e)', () => {
       .post('/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
       .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [
           { productId: firstProduct.id, quantity: 2 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(409);
+
+    const body = parseErrorResponseBody(conflictResponse.body);
+    const updatedFirstProduct = await productsRepository!.findOneByOrFail({
+      id: firstProduct.id,
+    });
+    const updatedSecondProduct = await productsRepository!.findOneByOrFail({
+      id: secondProduct.id,
+    });
+
+    expect(body.errorCode).toBe('IDEMPOTENCY_REQUEST_CONFLICT');
+    expect(await ordersRepository!.count()).toBe(1);
+    expect(await orderItemsRepository!.count()).toBe(2);
+    expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(updatedFirstProduct.stockQuantity).toBe(4);
+    expect(updatedSecondProduct.stockQuantity).toBe(2);
+  });
+
+  it('rejects a reused idempotency key when the customer device token changes', async () => {
+    const firstProduct = await seedProduct({
+      name: 'Conflict Product Token A',
+      priceAmount: 12999,
+      stockQuantity: 5,
+    });
+    const secondProduct = await seedProduct({
+      name: 'Conflict Product Token B',
+      priceAmount: 8999,
+      stockQuantity: 4,
+    });
+
+    await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-device-token')
+      .send({
+        customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
+          { productId: secondProduct.id, quantity: 2 },
+        ],
+      })
+      .expect(201);
+
+    const conflictResponse = await request(app!.getHttpServer())
+      .post('/orders')
+      .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-device-token')
+      .send({
+        customerDeviceToken: 'fcm-registration-token-test-device-002',
+        items: [
+          { productId: firstProduct.id, quantity: 1 },
           { productId: secondProduct.id, quantity: 2 },
         ],
       })

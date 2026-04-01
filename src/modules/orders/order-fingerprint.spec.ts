@@ -3,6 +3,7 @@ import { createOrderRequestFingerprint } from './order-fingerprint';
 describe('createOrderRequestFingerprint', () => {
   it('returns the same fingerprint for the same basket in a different item order', () => {
     const firstFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-a',
       items: [
         {
           productId: 'c0000000-0000-4000-8000-000000000003',
@@ -15,6 +16,7 @@ describe('createOrderRequestFingerprint', () => {
       ],
     });
     const secondFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-a',
       items: [
         {
           productId: 'a0000000-0000-4000-8000-000000000001',
@@ -32,6 +34,7 @@ describe('createOrderRequestFingerprint', () => {
 
   it('returns a different fingerprint when the basket contents change', () => {
     const originalFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-a',
       items: [
         {
           productId: 'a0000000-0000-4000-8000-000000000001',
@@ -40,10 +43,34 @@ describe('createOrderRequestFingerprint', () => {
       ],
     });
     const changedFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-a',
       items: [
         {
           productId: 'a0000000-0000-4000-8000-000000000001',
           quantity: 2,
+        },
+      ],
+    });
+
+    expect(originalFingerprint).not.toBe(changedFingerprint);
+  });
+
+  it('returns a different fingerprint when the target device token changes', () => {
+    const originalFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-a',
+      items: [
+        {
+          productId: 'a0000000-0000-4000-8000-000000000001',
+          quantity: 1,
+        },
+      ],
+    });
+    const changedFingerprint = createOrderRequestFingerprint({
+      customerDeviceToken: 'token-b',
+      items: [
+        {
+          productId: 'a0000000-0000-4000-8000-000000000001',
+          quantity: 1,
         },
       ],
     });

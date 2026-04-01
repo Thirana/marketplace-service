@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { CreateOrderDto } from './dto/create-order.dto';
 
 type CanonicalOrderFingerprintPayload = {
+  customerDeviceToken: string;
   currency: 'LKR';
   items: Array<{
     productId: string;
@@ -10,12 +11,14 @@ type CanonicalOrderFingerprintPayload = {
 };
 
 /**
- * Canonicalizes the basket so logically identical multi-item orders produce
- * the same fingerprint even when clients send line items in a different order.
+ * Canonicalizes the effective order request so logically identical multi-item
+ * orders produce the same fingerprint even when clients send line items in a
+ * different order.
  */
 const buildCanonicalOrderFingerprintPayload = (
   createOrderDto: CreateOrderDto,
 ): CanonicalOrderFingerprintPayload => ({
+  customerDeviceToken: createOrderDto.customerDeviceToken,
   currency: 'LKR',
   items: [...createOrderDto.items]
     .map((item) => ({
@@ -26,8 +29,8 @@ const buildCanonicalOrderFingerprintPayload = (
 });
 
 /**
- * Hashes the canonical basket payload into a fixed-width fingerprint that can
- * be stored and compared efficiently by the idempotency layer.
+ * Hashes the canonical effective request payload into a fixed-width
+ * fingerprint that can be stored and compared efficiently by idempotency.
  */
 export const createOrderRequestFingerprint = (
   createOrderDto: CreateOrderDto,
