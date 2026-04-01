@@ -85,10 +85,17 @@ The order write path currently:
 - requires a non-empty `customerDeviceToken`
 - snapshots line-item prices plus the aggregate order total
 - reduces stock for all items in the same transaction as order creation
+- persists a `PENDING` notification intent in the same transaction as order creation
 - replays the original successful result when the same `Idempotency-Key` is retried with the same effective request
 - rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket or a different `customerDeviceToken`
 
 For this assignment, the runtime business assumption is a single-currency catalog in `LKR`. The `currency` field is still retained in the schema and API so monetary data remains explicit and future extension does not require a schema redesign.
+
+## Notification Endpoint
+
+- `GET /orders/:id/notifications` returns persisted notifications for an order
+- this endpoint is admin-only and requires `x-api-key`
+- the response includes notification status and a masked preview of the target device token
 
 ## Demo Data
 
@@ -139,6 +146,7 @@ Suggested order demo flow:
 ```
 
 8. Repeat the same `POST /orders` request with the same `Idempotency-Key` to verify replay behavior.
+9. Call `GET /orders/<created-order-id>/notifications` with `x-api-key` to inspect the persisted notification intent.
 
 ## Environment Notes
 

@@ -9,6 +9,8 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { Logger } from 'winston';
+import { Notification } from '../../notifications/entities/notification.entity';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { Product } from '../../products/entities/product.entity';
 import { CreateOrderDto, CreateOrderItemDto } from '../dto/create-order.dto';
 import {
@@ -41,18 +43,25 @@ type PreparedOrderItemDraft = {
   lineTotalAmount: number;
 };
 
+type CreatedOrderTransactionResult = {
+  order: Order;
+  notification: Notification;
+};
+
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
     @Inject(WINSTON_MODULE_PROVIDER)
     private readonly logger: Logger,
   ) {}
 
   /**
-   * Creates a multi-item order inside a single transaction and upgrades the
-   * flow with DB-backed idempotency so safe retries return a stable result.
+   * Creates a multi-item order inside a single transaction, persists a pending
+   * notification intent, and upgrades the flow with DB-backed idempotency so
+   * safe retries return a stable result.
    */
   async create(
     idempotencyKey: string,
@@ -61,26 +70,37 @@ export class OrdersService {
     const requestFingerprint = createOrderRequestFingerprint(createOrderDto);
 
     try {
-      const order = await this.dataSource.transaction(async (manager) => {
-        const idempotencyRecord = await this.createIdempotencyRecord(
-          manager,
-          idempotencyKey,
-          requestFingerprint,
-        );
-        const createdOrder = await this.createNewOrder(
-          manager,
-          idempotencyKey,
-          createOrderDto,
-        );
+      const { order, notification } = await this.dataSource.transaction(
+        async (manager): Promise<CreatedOrderTransactionResult> => {
+          const idempotencyRecord = await this.createIdempotencyRecord(
+            manager,
+            idempotencyKey,
+            requestFingerprint,
+          );
+          const createdOrder = await this.createNewOrder(
+            manager,
+            idempotencyKey,
+            createOrderDto,
+          );
+          const createdNotification =
+            await this.notificationsService.createPendingOrderCreatedNotification(
+              manager,
+              createdOrder,
+              createOrderDto.customerDeviceToken,
+            );
 
-        idempotencyRecord.orderId = createdOrder.id;
-        idempotencyRecord.status = OrderIdempotencyStatus.COMPLETED;
-        await manager
-          .getRepository(OrderIdempotencyKey)
-          .save(idempotencyRecord);
+          idempotencyRecord.orderId = createdOrder.id;
+          idempotencyRecord.status = OrderIdempotencyStatus.COMPLETED;
+          await manager
+            .getRepository(OrderIdempotencyKey)
+            .save(idempotencyRecord);
 
-        return createdOrder;
-      });
+          return {
+            order: createdOrder,
+            notification: createdNotification,
+          };
+        },
+      );
 
       this.logger.info({
         event: 'order.created',
@@ -88,6 +108,13 @@ export class OrdersService {
         itemsCount: order.items.length,
         totalPriceAmount: order.totalPriceAmount,
         currency: order.currency,
+      });
+      this.logger.info({
+        event: 'notification.created',
+        notificationId: notification.id,
+        orderId: order.id,
+        type: notification.type,
+        status: notification.status,
       });
 
       return toOrderResponseDto(order);

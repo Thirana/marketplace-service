@@ -9,6 +9,7 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   MISSING_IDEMPOTENCY_KEY_ERROR_CODE,
 } from '../src/common/http/idempotency-key.constants';
+import { Notification } from '../src/modules/notifications/entities/notification.entity';
 import { OrderIdempotencyKey } from '../src/modules/orders/entities/order-idempotency-key.entity';
 import { OrderItem } from '../src/modules/orders/entities/order-item.entity';
 import { Order } from '../src/modules/orders/entities/order.entity';
@@ -102,6 +103,7 @@ describe('OrdersController (e2e)', () => {
   let orderIdempotencyKeysRepository:
     | Repository<OrderIdempotencyKey>
     | undefined;
+  let notificationsRepository: Repository<Notification> | undefined;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -118,12 +120,13 @@ describe('OrdersController (e2e)', () => {
     orderItemsRepository = dataSource.getRepository(OrderItem);
     orderIdempotencyKeysRepository =
       dataSource.getRepository(OrderIdempotencyKey);
+    notificationsRepository = dataSource.getRepository(Notification);
   });
 
   afterEach(async () => {
     if (dataSource) {
       await dataSource.query(
-        'TRUNCATE TABLE "order_idempotency_keys", "order_items", "orders", "products" RESTART IDENTITY CASCADE',
+        'TRUNCATE TABLE "order_idempotency_keys", "notifications", "order_items", "orders", "products" RESTART IDENTITY CASCADE',
       );
     }
   });
@@ -350,6 +353,7 @@ describe('OrdersController (e2e)', () => {
     expect(persistedOrder.totalPriceAmount).toBe(82994);
     expect(persistedOrder.currency).toBe('LKR');
     expect(persistedOrderItems).toHaveLength(3);
+    expect(await notificationsRepository!.count()).toBe(1);
     expect(updatedFirstProduct.stockQuantity).toBe(3);
     expect(updatedSecondProduct.stockQuantity).toBe(3);
     expect(updatedThirdProduct.stockQuantity).toBe(4);
@@ -404,6 +408,7 @@ describe('OrdersController (e2e)', () => {
     expect(await ordersRepository!.count()).toBe(1);
     expect(await orderItemsRepository!.count()).toBe(2);
     expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(await notificationsRepository!.count()).toBe(1);
     expect(updatedFirstProduct.stockQuantity).toBe(4);
     expect(updatedSecondProduct.stockQuantity).toBe(2);
   });
@@ -450,6 +455,7 @@ describe('OrdersController (e2e)', () => {
     expect(await ordersRepository!.count()).toBe(1);
     expect(await orderItemsRepository!.count()).toBe(2);
     expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(await notificationsRepository!.count()).toBe(1);
   });
 
   it('rejects a reused idempotency key when the basket changes', async () => {
@@ -500,6 +506,7 @@ describe('OrdersController (e2e)', () => {
     expect(await ordersRepository!.count()).toBe(1);
     expect(await orderItemsRepository!.count()).toBe(2);
     expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(await notificationsRepository!.count()).toBe(1);
     expect(updatedFirstProduct.stockQuantity).toBe(4);
     expect(updatedSecondProduct.stockQuantity).toBe(2);
   });
@@ -552,6 +559,7 @@ describe('OrdersController (e2e)', () => {
     expect(await ordersRepository!.count()).toBe(1);
     expect(await orderItemsRepository!.count()).toBe(2);
     expect(await orderIdempotencyKeysRepository!.count()).toBe(1);
+    expect(await notificationsRepository!.count()).toBe(1);
     expect(updatedFirstProduct.stockQuantity).toBe(4);
     expect(updatedSecondProduct.stockQuantity).toBe(2);
   });

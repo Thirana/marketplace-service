@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Notification } from '../../notifications/entities/notification.entity';
 import { OrderItem } from './order-item.entity';
 
 @Entity({ name: 'orders' })
@@ -24,6 +25,9 @@ export class Order {
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   items!: OrderItem[];
+
+  @OneToMany(() => Notification, (notification) => notification.order)
+  notifications!: Notification[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
