@@ -62,6 +62,9 @@ The default local database values in `.env.example` match `compose.yaml`.
 
 Swagger is available at `/docs` once the application is running.
 
+Postman artifacts are available under `docs/postman/`.
+Import `marketplace-service.postman_collection.json` and `marketplace-service.local.postman_environment.json` into Postman if you want a ready-made request set for the current API surface.
+
 ## Health Endpoints
 
 - `GET /v1/health/live` returns application liveness

@@ -1,0 +1,414 @@
+{
+  "info": {
+    "_postman_id": "aa7b9076-88fc-4e80-ae9c-5e27fbb31a7b",
+    "name": "Marketplace Service",
+    "description": "Postman collection for the Marketplace Service v1 API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "adminApiKey",
+      "value": "test-admin-key"
+    },
+    {
+      "key": "customerDeviceToken",
+      "value": "paste-fcm-registration-token-here"
+    },
+    {
+      "key": "limit",
+      "value": "20"
+    },
+    {
+      "key": "cursor",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "secondProductId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "demo-order-1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Live",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "health",
+                "live"
+              ]
+            },
+            "description": "Application liveness check."
+          },
+          "response": []
+        },
+        {
+          "name": "Ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Readiness check including PostgreSQL connectivity."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body && body.pageInfo && typeof body.pageInfo.nextCursor === 'string') {",
+                  "    pm.collectionVariables.set('cursor', body.pageInfo.nextCursor);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/products?limit={{limit}}&cursor={{cursor}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{cursor}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Public product listing with cursor pagination. Enable the cursor query param after the first request if you want to continue paging."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body && body.id) {",
+                  "    pm.collectionVariables.set('productId', body.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{adminApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wireless Mechanical Keyboard\",\n  \"description\": \"Compact keyboard with hot-swappable switches.\",\n  \"priceAmount\": 12999,\n  \"currency\": \"LKR\",\n  \"stockQuantity\": 25,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Creates a product and stores the returned id in the productId collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body && body.id) {",
+                  "    pm.collectionVariables.set('secondProductId', body.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{adminApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"USB-C Docking Station\",\n  \"description\": \"Multi-port desk dock for laptop workflows.\",\n  \"priceAmount\": 18999,\n  \"currency\": \"LKR\",\n  \"stockQuantity\": 10,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Creates a second product and stores the returned id in the secondProductId collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{adminApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priceAmount\": 13999,\n  \"stockQuantity\": 30,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Updates the product identified by the productId collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{adminApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Soft-deletes the product identified by the productId collection variable."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body && body.id) {",
+                  "    pm.collectionVariables.set('orderId', body.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerDeviceToken\": \"{{customerDeviceToken}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 },\n    { \"productId\": \"{{secondProductId}}\", \"quantity\": 2 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "Creates a multi-item order and stores the returned id in the orderId collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Replay Same Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerDeviceToken\": \"{{customerDeviceToken}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 },\n    { \"productId\": \"{{secondProductId}}\", \"quantity\": 2 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "Replays the same order request using the same Idempotency-Key."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications By Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{adminApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/{{orderId}}/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "{{orderId}}",
+                "notifications"
+              ]
+            },
+            "description": "Returns persisted notifications for the order identified by the orderId collection variable."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
