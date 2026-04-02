@@ -1,6 +1,6 @@
 # Marketplace Service
 
-NestJS backend for a backend and platform engineering assessment. The project is being built phase by phase with an emphasis on production-style engineering decisions rather than starter-level scaffolding.
+NestJS backend for a backend and platform engineering assessment, built with an emphasis on production-style engineering decisions rather than starter-level scaffolding.
 
 ## Current Baseline
 
@@ -75,7 +75,7 @@ Swagger is available at `/docs` once the application is running.
 ## Order Endpoint
 
 - `POST /v1/orders` creates a multi-item order and requires the `Idempotency-Key` header
-- `POST /v1/orders` also requires `customerDeviceToken` in the request body so later notification phases have an explicit FCM delivery target
+- `POST /v1/orders` also requires `customerDeviceToken` in the request body so the service has an explicit FCM delivery target
 
 The order write path currently:
 
@@ -94,7 +94,7 @@ For this assignment, the runtime business assumption is a single-currency catalo
 
 ## Notification Endpoint
 
-- `GET /v1/orders/:id/notifications` returns persisted notifications for an order
+- `GET /v1/orders/:orderId/notifications` returns persisted notifications for an order
 - this endpoint is admin-only and requires `x-api-key`
 - the response includes notification status and a masked preview of the target device token
 - `providerMessageId`, `sentAt`, `failedAt`, and `failureReason` reflect the Firebase delivery outcome once the async attempt finishes
@@ -153,7 +153,7 @@ Suggested order demo flow:
 ## Environment Notes
 
 - `DB_*` values are required and should point to the local Docker Postgres instance during development.
-- `ADMIN_API_KEY` is required now because later admin routes will depend on it.
+- `ADMIN_API_KEY` is required because admin routes depend on it.
 - Firebase configuration is optional as a group for local startup, but notification delivery will move records to `FAILED` until real credentials are provided.
 - Application code should read config through Nest config injection, not directly from `process.env`.
 - The current business assumption is a single-currency system using `LKR`, even though currency stays explicit in the schema and response DTOs.

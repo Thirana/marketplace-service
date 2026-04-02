@@ -37,7 +37,7 @@ lerna-debug.log*
 
 # Agent guidance and local planning docs
 AGENTS.md
-/docs
+/doc
 
 # dotenv environment variable files
 .env
