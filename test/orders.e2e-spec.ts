@@ -139,7 +139,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct();
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
         items: [{ productId: product.id, quantity: 1 }],
@@ -153,7 +153,7 @@ describe('OrdersController (e2e)', () => {
 
   it('rejects an empty basket', async () => {
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'empty-basket-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -170,7 +170,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct();
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'missing-device-token-check')
       .send({
         items: [{ productId: product.id, quantity: 1 }],
@@ -186,7 +186,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct();
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'duplicate-product-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -204,7 +204,7 @@ describe('OrdersController (e2e)', () => {
 
   it('rejects orders for missing products', async () => {
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'missing-product-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -226,7 +226,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct({ isActive: false });
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'inactive-product-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -243,7 +243,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct({ currency: 'USD' });
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'unsupported-currency-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -260,7 +260,7 @@ describe('OrdersController (e2e)', () => {
     const product = await seedProduct({ stockQuantity: 2 });
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'stock-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -291,7 +291,7 @@ describe('OrdersController (e2e)', () => {
     });
 
     const response = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'create-order-success')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -372,7 +372,7 @@ describe('OrdersController (e2e)', () => {
     });
 
     const firstResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -384,7 +384,7 @@ describe('OrdersController (e2e)', () => {
       .expect(201);
 
     const replayResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-same-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -426,7 +426,7 @@ describe('OrdersController (e2e)', () => {
     });
 
     const firstResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -438,7 +438,7 @@ describe('OrdersController (e2e)', () => {
       .expect(201);
 
     const replayResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-canonical-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -471,7 +471,7 @@ describe('OrdersController (e2e)', () => {
     });
 
     await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -483,7 +483,7 @@ describe('OrdersController (e2e)', () => {
       .expect(201);
 
     const conflictResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-basket')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -524,7 +524,7 @@ describe('OrdersController (e2e)', () => {
     });
 
     await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-device-token')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -536,7 +536,7 @@ describe('OrdersController (e2e)', () => {
       .expect(201);
 
     const conflictResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set(IDEMPOTENCY_KEY_HEADER, 'replay-conflict-device-token')
       .send({
         customerDeviceToken: 'fcm-registration-token-test-device-002',

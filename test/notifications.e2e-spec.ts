@@ -17,6 +17,8 @@ import { Product } from '../src/modules/products/entities/product.entity';
 import { parseErrorResponseBody } from './support/http-response.helpers';
 
 const DEFAULT_CUSTOMER_DEVICE_TOKEN = 'fcm-registration-token-test-device-001';
+const NOTIFICATION_STATUS_POLL_ATTEMPTS = 100;
+const NOTIFICATION_STATUS_POLL_DELAY_MS = 50;
 
 type NotificationResponseBody = {
   id: string;
@@ -165,7 +167,7 @@ describe('NotificationsController (e2e)', () => {
     });
 
     const orderResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set('Idempotency-Key', 'notification-persistence-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -200,7 +202,7 @@ describe('NotificationsController (e2e)', () => {
     });
 
     const orderResponse = await request(app!.getHttpServer())
-      .post('/orders')
+      .post('/v1/orders')
       .set('Idempotency-Key', 'notification-read-check')
       .send({
         customerDeviceToken: DEFAULT_CUSTOMER_DEVICE_TOKEN,
@@ -211,7 +213,7 @@ describe('NotificationsController (e2e)', () => {
     const orderId = parseOrderId(orderResponse.body);
     await waitForNotificationStatus(orderId, NotificationStatus.FAILED);
     const response = await request(app!.getHttpServer())
-      .get(`/orders/${orderId}/notifications`)
+      .get(`/v1/orders/${orderId}/notifications`)
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .expect(200);
 
@@ -235,7 +237,7 @@ describe('NotificationsController (e2e)', () => {
 
   it('rejects notification reads without an admin API key', async () => {
     const response = await request(app!.getHttpServer())
-      .get('/orders/8c9f7e84-26b9-4d81-9e54-15e1d0f4d91f/notifications')
+      .get('/v1/orders/8c9f7e84-26b9-4d81-9e54-15e1d0f4d91f/notifications')
       .expect(401);
 
     const body = parseErrorResponseBody(response.body);
@@ -245,7 +247,7 @@ describe('NotificationsController (e2e)', () => {
 
   it('returns 404 when the order does not exist', async () => {
     const response = await request(app!.getHttpServer())
-      .get('/orders/8c9f7e84-26b9-4d81-9e54-15e1d0f4d91f/notifications')
+      .get('/v1/orders/8c9f7e84-26b9-4d81-9e54-15e1d0f4d91f/notifications')
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .expect(404);
 
@@ -300,7 +302,11 @@ describe('NotificationsController (e2e)', () => {
     orderId: string,
     expectedStatus: NotificationStatus,
   ): Promise<Notification> {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < NOTIFICATION_STATUS_POLL_ATTEMPTS;
+      attempt += 1
+    ) {
       const notification = await notificationsRepository!.findOne({
         where: { orderId },
       });
@@ -309,7 +315,9 @@ describe('NotificationsController (e2e)', () => {
         return notification;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 25));
+      await new Promise((resolve) =>
+        setTimeout(resolve, NOTIFICATION_STATUS_POLL_DELAY_MS),
+      );
     }
 
     throw new Error(

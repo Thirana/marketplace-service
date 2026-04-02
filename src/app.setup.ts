@@ -2,6 +2,7 @@ import {
   INestApplication,
   LoggerService,
   ValidationPipe,
+  VersioningType,
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AppExceptionFilter } from './common/http/app-exception.filter';
@@ -16,6 +17,9 @@ export const configureApp = <T extends INestApplication>(app: T): T => {
   const structuredLogger = app.get<LoggerService>(WINSTON_MODULE_NEST_PROVIDER);
 
   app.useLogger(structuredLogger);
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
   app.use(requestIdMiddleware);
   app.useGlobalPipes(
     new ValidationPipe({

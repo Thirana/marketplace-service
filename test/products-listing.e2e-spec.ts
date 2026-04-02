@@ -114,7 +114,7 @@ describe('Products listing (e2e)', () => {
     );
 
     const response = await request(app!.getHttpServer())
-      .get('/products?limit=2')
+      .get('/v1/products?limit=2')
       .expect(200);
 
     const body = parseProductsListBody(response.body);
@@ -141,12 +141,15 @@ describe('Products listing (e2e)', () => {
     );
 
     const firstPage = parseProductsListBody(
-      (await request(app!.getHttpServer()).get('/products?limit=2').expect(200))
-        .body,
+      (
+        await request(app!.getHttpServer())
+          .get('/v1/products?limit=2')
+          .expect(200)
+      ).body,
     );
 
     const response = await request(app!.getHttpServer())
-      .get('/products')
+      .get('/v1/products')
       .query({
         limit: 2,
         cursor: firstPage.pageInfo.nextCursor,
@@ -163,7 +166,7 @@ describe('Products listing (e2e)', () => {
 
   it('enforces the maximum page size constraint', async () => {
     const response = await request(app!.getHttpServer())
-      .get('/products?limit=100')
+      .get('/v1/products?limit=100')
       .expect(400);
 
     const body = parseErrorResponseBody(response.body);
@@ -187,7 +190,7 @@ describe('Products listing (e2e)', () => {
     await productsRepository!.softDelete(deletedProduct.id);
 
     const response = await request(app!.getHttpServer())
-      .get('/products')
+      .get('/v1/products')
       .expect(200);
 
     const body = parseProductsListBody(response.body);

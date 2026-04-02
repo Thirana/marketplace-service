@@ -25,7 +25,7 @@ describe('HealthController (e2e)', () => {
 
   it('/health/live (GET)', () => {
     return request(app!.getHttpServer())
-      .get('/health/live')
+      .get('/v1/health/live')
       .expect(200)
       .expect(({ body }) => {
         expect(body).toMatchObject({
@@ -39,7 +39,7 @@ describe('HealthController (e2e)', () => {
 
   it('/health/ready (GET)', () => {
     return request(app!.getHttpServer())
-      .get('/health/ready')
+      .get('/v1/health/ready')
       .expect(200)
       .expect(({ body }) => {
         expect(body).toMatchObject({
@@ -53,7 +53,7 @@ describe('HealthController (e2e)', () => {
 
   it('returns the standardized error shape for unknown routes', () => {
     return request(app!.getHttpServer())
-      .get('/unknown-route')
+      .get('/v1/unknown-route')
       .expect(404)
       .expect(
         (response: {

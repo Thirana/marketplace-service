@@ -101,7 +101,7 @@ describe('ProductsController (e2e)', () => {
 
   it('rejects product creation without the admin API key', async () => {
     const response = await request(app!.getHttpServer())
-      .post('/products')
+      .post('/v1/products')
       .send({
         name: 'Wireless Mechanical Keyboard',
         priceAmount: 12999,
@@ -117,7 +117,7 @@ describe('ProductsController (e2e)', () => {
 
   it('creates a product for an authorized admin', async () => {
     const response = await request(app!.getHttpServer())
-      .post('/products')
+      .post('/v1/products')
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .send({
         name: 'Wireless Mechanical Keyboard',
@@ -145,7 +145,7 @@ describe('ProductsController (e2e)', () => {
     const createdProduct = parseProductResponseBody(
       (
         await request(app!.getHttpServer())
-          .post('/products')
+          .post('/v1/products')
           .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
           .send({
             name: 'Wireless Mechanical Keyboard',
@@ -158,7 +158,7 @@ describe('ProductsController (e2e)', () => {
     );
 
     const response = await request(app!.getHttpServer())
-      .patch(`/products/${createdProduct.id}`)
+      .patch(`/v1/products/${createdProduct.id}`)
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .send({
         name: 'Wireless Mechanical Keyboard Pro',
@@ -183,7 +183,7 @@ describe('ProductsController (e2e)', () => {
     const createdProduct = parseProductResponseBody(
       (
         await request(app!.getHttpServer())
-          .post('/products')
+          .post('/v1/products')
           .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
           .send({
             name: 'Wireless Mechanical Keyboard',
@@ -196,12 +196,12 @@ describe('ProductsController (e2e)', () => {
     );
 
     await request(app!.getHttpServer())
-      .delete(`/products/${createdProduct.id}`)
+      .delete(`/v1/products/${createdProduct.id}`)
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .expect(204);
 
     await request(app!.getHttpServer())
-      .patch(`/products/${createdProduct.id}`)
+      .patch(`/v1/products/${createdProduct.id}`)
       .set(ADMIN_API_KEY_HEADER, 'test-admin-key')
       .send({ name: 'Deleted Product' })
       .expect(404);

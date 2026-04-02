@@ -27,7 +27,7 @@ const adminApiHeader = ApiHeader({
 });
 
 @ApiTags('notifications')
-@Controller('orders/:orderId/notifications')
+@Controller({ path: 'orders/:orderId/notifications', version: '1' })
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

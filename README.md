@@ -64,18 +64,18 @@ Swagger is available at `/docs` once the application is running.
 
 ## Health Endpoints
 
-- `GET /health/live` returns application liveness
-- `GET /health/ready` checks PostgreSQL readiness
+- `GET /v1/health/live` returns application liveness
+- `GET /v1/health/ready` checks PostgreSQL readiness
 
 ## Product Endpoints
 
-- `GET /products` returns the public product catalog using cursor pagination
-- `POST /products`, `PATCH /products/:id`, and `DELETE /products/:id` are admin-only and require `x-api-key`
+- `GET /v1/products` returns the public product catalog using cursor pagination
+- `POST /v1/products`, `PATCH /v1/products/:id`, and `DELETE /v1/products/:id` are admin-only and require `x-api-key`
 
 ## Order Endpoint
 
-- `POST /orders` creates a multi-item order and requires the `Idempotency-Key` header
-- `POST /orders` also requires `customerDeviceToken` in the request body so later notification phases have an explicit FCM delivery target
+- `POST /v1/orders` creates a multi-item order and requires the `Idempotency-Key` header
+- `POST /v1/orders` also requires `customerDeviceToken` in the request body so later notification phases have an explicit FCM delivery target
 
 The order write path currently:
 
@@ -94,7 +94,7 @@ For this assignment, the runtime business assumption is a single-currency catalo
 
 ## Notification Endpoint
 
-- `GET /orders/:id/notifications` returns persisted notifications for an order
+- `GET /v1/orders/:id/notifications` returns persisted notifications for an order
 - this endpoint is admin-only and requires `x-api-key`
 - the response includes notification status and a masked preview of the target device token
 - `providerMessageId`, `sentAt`, `failedAt`, and `failureReason` reflect the Firebase delivery outcome once the async attempt finishes
@@ -122,8 +122,8 @@ Suggested pagination demo flow:
 3. `npm run seed:demo`
 4. `npm run start:dev`
 5. Open Swagger at `http://localhost:3000/docs`
-6. Call `GET /products?limit=20`
-7. Copy the returned `pageInfo.nextCursor` into the next `GET /products` request
+6. Call `GET /v1/products?limit=20`
+7. Copy the returned `pageInfo.nextCursor` into the next `GET /v1/products` request
 
 Suggested order demo flow:
 
@@ -132,8 +132,8 @@ Suggested order demo flow:
 3. `npm run seed:demo`
 4. `npm run start:dev`
 5. Open Swagger at `http://localhost:3000/docs`
-6. Pick a seeded product ID from `GET /products`
-7. Call `POST /orders` with:
+6. Pick a seeded product ID from `GET /v1/products`
+7. Call `POST /v1/orders` with:
    - header: `Idempotency-Key: demo-order-1`
    - body:
 
@@ -147,8 +147,8 @@ Suggested order demo flow:
 }
 ```
 
-8. Repeat the same `POST /orders` request with the same `Idempotency-Key` to verify replay behavior.
-9. Call `GET /orders/<created-order-id>/notifications` with `x-api-key` to inspect the persisted notification record and final delivery status.
+8. Repeat the same `POST /v1/orders` request with the same `Idempotency-Key` to verify replay behavior.
+9. Call `GET /v1/orders/<created-order-id>/notifications` with `x-api-key` to inspect the persisted notification record and final delivery status.
 
 ## Environment Notes
 
