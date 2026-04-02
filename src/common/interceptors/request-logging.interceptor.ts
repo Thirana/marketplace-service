@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common';
 import type { LoggerService } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
-import { RequestWithRequestId } from './request.types';
+import { RequestWithRequestId } from '../http/request.types';
 
 /**
  * Emits one structured log per completed request, including duration and the

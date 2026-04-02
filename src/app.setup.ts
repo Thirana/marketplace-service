@@ -5,9 +5,9 @@ import {
   VersioningType,
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { AppExceptionFilter } from './common/http/app-exception.filter';
-import { RequestLoggingInterceptor } from './common/http/request-logging.interceptor';
-import { requestIdMiddleware } from './common/http/request-id.middleware';
+import { AppExceptionFilter } from './common/filters/app-exception.filter';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { requestIdMiddleware } from './common/middlewares/request-id.middleware';
 
 /**
  * Applies the shared application pipeline so runtime bootstrap and e2e tests

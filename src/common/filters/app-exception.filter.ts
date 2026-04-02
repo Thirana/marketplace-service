@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common';
 import type { LoggerService } from '@nestjs/common';
 import { Response } from 'express';
-import { RequestWithRequestId } from './request.types';
-import { resolveErrorCode } from './error-code.util';
+import { resolveErrorCode } from '../http/error-code.util';
+import { RequestWithRequestId } from '../http/request.types';
 
 type ErrorResponseBody = {
   statusCode?: number;

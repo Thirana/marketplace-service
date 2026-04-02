@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { NextFunction, Response } from 'express';
-import { REQUEST_ID_HEADER } from './request-id.constants';
-import { RequestWithRequestId } from './request.types';
+import { REQUEST_ID_HEADER } from '../http/request-id.constants';
+import { RequestWithRequestId } from '../http/request.types';
 
 /**
  * Preserves an incoming request ID when present, otherwise generates one and
