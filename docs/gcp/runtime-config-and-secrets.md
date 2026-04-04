@@ -12,8 +12,6 @@ This application validates its environment during startup and fails fast if crit
 
 That is important for deployment planning because configuration is not an afterthought here. If the database settings are wrong, the service should fail to start. If only part of the Firebase credential set is provided, startup validation should reject it.
 
-A GCP deployment plan has to respect those behaviors rather than flattening everything into generic environment examples.
-
 ## Core Environment Variables
 
 The service currently depends on these main variables:
@@ -42,8 +40,6 @@ The following values should be stored in Secret Manager:
 3. `FIREBASE_PROJECT_ID`, if the team prefers to treat the Firebase project identifier as sensitive deployment metadata
 4. `FIREBASE_CLIENT_EMAIL`
 5. `FIREBASE_PRIVATE_KEY`
-
-In practice, the most critical secret is `FIREBASE_PRIVATE_KEY`. That value should never be handled as a normal checked-in environment file.
 
 ## What Can Stay As Plain Environment Variables
 
@@ -94,7 +90,7 @@ Cloud Run injects `PORT`, and the application already reads `process.env.PORT`. 
 
 Firebase configuration in this repository is grouped.
 
-The current validation behavior expects all three of these together:
+The current validation behavior expects all three of these:
 
 1. `FIREBASE_PROJECT_ID`
 2. `FIREBASE_CLIENT_EMAIL`
@@ -106,7 +102,7 @@ This is worth documenting because it is easy to partially configure Firebase by 
 
 ## Secret Injection Style
 
-For this application, environment-based secret injection is the most natural fit because the code already reads runtime config through the Nest configuration layer.
+For this application, environment based secret injection is the most natural fit because the code already reads runtime config through the Nest configuration layer.
 
 Cloud Run supports both:
 
@@ -114,18 +110,6 @@ Cloud Run supports both:
 2. exposing secrets as environment variables
 
 For this repository, environment variables are the simpler documented choice. They align with the existing app behavior and reduce unnecessary translation between the platform and the codebase.
-
-## Fail-Fast Startup Behavior
-
-The deployment plan should call out one important runtime characteristic.
-
-This application is intentionally fail-fast:
-
-1. if DB configuration is wrong, startup fails
-2. if the database connection cannot initialize, startup fails
-3. if required env validation fails, startup fails
-
-This is good production behavior. A broken revision should fail clearly rather than appearing partially healthy.
 
 ## Service Account Responsibilities
 
@@ -137,23 +121,9 @@ At a high level, it should be able to:
 2. connect to Cloud SQL
 3. emit logs and metrics through normal Google Cloud service integration
 
-It should not be granted broad project-wide permissions without a clear reason.
+It should not be granted broad project wide permissions without a clear reason.
 
 The same principle applies to the migration job service account. It needs enough permission to run migrations against Cloud SQL and read the same required configuration, but it does not need broad administrative rights.
-
-## Configuration Summary
-
-The right production configuration model is not a redesign of the app. It is a careful mapping of the existing contract into Google Cloud services.
-
-That means:
-
-1. keep the current `DB_*` shape
-2. inject secrets from Secret Manager
-3. let Cloud Run provide `PORT`
-4. preserve the grouped Firebase rule
-5. rely on fail-fast startup to reject broken revisions
-
-That is the cleanest and least risky way to move this service onto GCP.
 
 ## References
 

@@ -21,11 +21,11 @@ This design keeps the release path close to Google Cloud's native workflow and a
 
 ## Why Cloud Build Is The Right CI/CD Choice Here
 
-Cloud Build fits this repository for two reasons.
+Cloud Build is a strong fit for this service because it keeps the release path close to the runtime platform.
 
-First, the assignment only asks for a deployment plan, not a fully customized pipeline framework. Cloud Build keeps the story simple and credible.
+The application is designed as a small containerized HTTP service with a managed PostgreSQL dependency, explicit health checks, and a straightforward build pipeline. Cloud Build works well with that shape because it can validate the code, produce the release image, publish it to Artifact Registry, and deploy it to Cloud Run without introducing a second CI/CD stack that has to be maintained separately from the target platform.
 
-Second, this repository does not currently include a Dockerfile, a `cloudbuild.yaml`, or infrastructure-as-code. Cloud Build can work well with that because Cloud Run supports continuous deployment from a Git repository and Google Cloud Buildpacks cover standard Node.js applications.
+It also fits the current repository state. The codebase already follows standard Node and NestJS build conventions, but it does not yet include a custom container build setup or dedicated deployment automation. Cloud Build provides a clean path from source to runtime while still leaving room for a more customized pipeline later if operational needs grow.
 
 ## Why Buildpacks Are The Recommended Default
 
@@ -33,7 +33,7 @@ Buildpacks are the right documented default because this codebase already matche
 
 1. standard `package.json` scripts
 2. NestJS build output in `dist/`
-3. no unusual native build tooling
+3. no native build tooling
 4. no existing container file that must be preserved
 
 That keeps the initial plan simple. If stricter runtime control is needed later, a Dockerfile can be introduced as a deliberate hardening step.
@@ -56,7 +56,7 @@ That order is important. It keeps validation, artifact creation, schema change, 
 
 ## Why Migrations Should Run In A Cloud Run Job
 
-This application depends on migration-managed schema changes and treats database correctness seriously. That is already visible in the runtime code and local workflow.
+This application depends on migration managed schema changes and treats database correctness seriously.
 
 Running migrations in a dedicated Cloud Run Job is the cleaner production model because:
 
@@ -65,18 +65,16 @@ Running migrations in a dedicated Cloud Run Job is the cleaner production model 
 3. failed migrations stop the release before the new API revision is promoted
 4. migration logs become easier to isolate and inspect
 
-This is better than burying migrations in the application startup path.
-
-## Important Repo-Specific Reality
+## Important Repo Specific Points
 
 The current repository only contains local migration scripts aimed at development workflows.
 
-That means a real implementation would likely add one of these before production rollout:
+That means a real implementation need to add one of these before production rollout:
 
 1. a compiled migration entrypoint that can run from the release image
 2. a small dedicated migration command designed for Cloud Run Job execution
 
-This note intentionally treats that as planned release engineering work, not as something that already exists in the repository.
+This note intentionally treats that as future planned release engineering work, not as something that already exists in the repository.
 
 ## Release Behavior
 
@@ -94,8 +92,6 @@ That gives the deployment path a sensible safety boundary. Database changes happ
 
 ## Rollback Strategy
 
-Rollback should be documented honestly rather than oversold.
-
 For the application layer, rollback is straightforward:
 
 1. redeploy the previous image or previous Cloud Run revision
@@ -104,7 +100,6 @@ For the database layer, rollback requires more care:
 
 1. not every schema change is trivially reversible
 2. some migration failures will require manual judgment
-3. the operational plan should prefer forward fixes over blind schema rollback
 
 That is a realistic tradeoff for a migration-based service.
 
@@ -119,18 +114,6 @@ Recommended model:
 3. merge to `main` triggers the production pipeline
 
 If a staging environment is introduced later, the same basic model can be extended. It does not need to be part of the initial assignment plan.
-
-## CI/CD Summary
-
-The recommended release flow is intentionally conservative:
-
-1. validate first
-2. build once
-3. run migrations explicitly
-4. deploy the exact built image
-5. let health checks gate traffic
-
-That is the right shape for this repository because it respects the application's current design rather than forcing it into a heavier platform model.
 
 ## References
 

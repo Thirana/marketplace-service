@@ -1,24 +1,25 @@
 # Marketplace Service
 
-NestJS backend for a backend and platform engineering assessment, built with an emphasis on production-style engineering decisions rather than starter-level scaffolding.
+NestJS backend for a backend and platform engineering assessment, built with an emphasis on production style engineering decisions.
 
 ## Current Baseline
 
 - validated environment configuration
-- Docker-managed local PostgreSQL
+- Docker managed local PostgreSQL
 - TypeORM runtime and CLI datasource setup
-- migration-only schema workflow
+- migration only schema workflow
 - structured JSON logging with request IDs
 - centralized API exception handling
 - health endpoints for liveness and readiness
 - public order creation with transactional stock reduction
-- explicit money modeling with a single-currency runtime assumption of `LKR`
 
 ## Prerequisites
 
 - Node.js 22+
 - npm
 - Docker Desktop or another running Docker daemon
+- Firebase project and service account credentials if you want real FCM delivery testing
+- a real FCM registration token from a test client if you want to verify end to end notification delivery
 
 ## Local Setup
 
@@ -63,7 +64,18 @@ The default local database values in `.env.example` match `compose.yaml`.
 Swagger is available at `/docs` once the application is running.
 
 Postman artifacts are available under `docs/postman/`.
-Import `marketplace-service.postman_collection.json` and `marketplace-service.local.postman_environment.json` into Postman if you want a ready-made request set for the current API surface.
+Import `marketplace-service.postman_collection.json` and `marketplace-service.local.postman_environment.json` into Postman if you want a ready made request set for the current API surface.
+
+## Documentation
+
+The `docs/` directory contains the main technical notes:
+
+- `docs/bootstrap/` summarizes application startup and shared runtime behavior
+- `docs/database/` covers schema design and the main database engineering decisions
+- `docs/services/` explains the behavior of the product listing, order creation, and notification services
+- `docs/limitations-and-tradeoff/` captures the main current limitations and design tradeoffs
+- `docs/gcp-deployment.md` and `docs/gcp/` describe the recommended GCP deployment model
+- `docs/postman/` contains importable Postman collection and environment files
 
 ## Health Endpoints
 
@@ -73,18 +85,18 @@ Import `marketplace-service.postman_collection.json` and `marketplace-service.lo
 ## Product Endpoints
 
 - `GET /v1/products` returns the public product catalog using cursor pagination
-- `POST /v1/products`, `PATCH /v1/products/:id`, and `DELETE /v1/products/:id` are admin-only and require `x-api-key`
+- `POST /v1/products`, `PATCH /v1/products/:id`, and `DELETE /v1/products/:id` are admin only and require `x-api-key`
 
 ## Order Endpoint
 
-- `POST /v1/orders` creates a multi-item order and requires the `Idempotency-Key` header
+- `POST /v1/orders` creates a multi item order and requires the `Idempotency-Key` header
 - `POST /v1/orders` also requires `customerDeviceToken` in the request body so the service has an explicit FCM delivery target
 
 The order write path currently:
 
+- builds a SHA-256 request fingerprint from the canonical effective request so logically identical retries can be recognized reliably
 - validates that every requested product exists and is active
 - rejects duplicate products in the same basket
-- rejects products that are not priced in `LKR`
 - requires a non-empty `customerDeviceToken`
 - snapshots line-item prices plus the aggregate order total
 - reduces stock for all items in the same transaction as order creation
@@ -92,8 +104,6 @@ The order write path currently:
 - schedules Firebase delivery after commit so the notification later transitions to `SENT` or `FAILED`
 - replays the original successful result when the same `Idempotency-Key` is retried with the same effective request
 - rejects the retry with `409` if the same `Idempotency-Key` is reused for a different basket or a different `customerDeviceToken`
-
-For this assignment, the runtime business assumption is a single-currency catalog in `LKR`. The `currency` field is still retained in the schema and API so monetary data remains explicit and future extension does not require a schema redesign.
 
 ## Notification Endpoint
 
@@ -104,7 +114,7 @@ For this assignment, the runtime business assumption is a single-currency catalo
 
 ## Demo Data
 
-Use the demo seed when you want an interview-friendly dataset for pagination walkthroughs.
+Use the demo seed when you want an dataset for pagination walkthroughs.
 
 ```bash
 npm run seed:demo

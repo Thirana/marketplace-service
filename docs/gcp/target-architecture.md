@@ -19,6 +19,7 @@ The recommended deployment model uses the following managed services:
 7. Secret Manager for sensitive values
 8. External Application Load Balancer for public ingress
 9. serverless NEG to connect the load balancer to Cloud Run
+10. Firebase remains an external downstream dependency for push notification delivery
 
 This is a production-style design, but it stays intentionally lightweight. The service is small enough that GKE, managed VMs, and more elaborate deployment stacks would add more operational work than value.
 
@@ -81,8 +82,6 @@ It gives the deployment plan:
 3. a place to attach edge controls later
 4. a way to keep Cloud Run ingress restricted so traffic does not bypass the intended frontend path
 
-For an assessment project, this is a good middle ground. It shows production awareness without pushing the design toward heavy infrastructure.
-
 ## Why Cloud Run Ingress Should Be Restricted
 
 The recommended setting is `internal-and-cloud-load-balancing`.
@@ -108,22 +107,6 @@ The public request path should work like this:
 7. Cloud Run reads secrets through environment and secret bindings configured at deployment time
 8. if notification delivery is enabled, the application talks to Firebase after the order transaction commits
 
-This is straightforward to explain and straightforward to operate.
-
-## Component Interaction
-
-At a high level, the production system would look like this:
-
-1. GitHub stores the source code
-2. Cloud Build reacts to new commits on the production branch
-3. Artifact Registry stores the release image
-4. Cloud Run serves the API from that image
-5. Cloud Run Job runs schema migrations from the same release image
-6. Cloud SQL provides PostgreSQL
-7. Secret Manager provides sensitive runtime values
-8. the external load balancer fronts the service for public traffic
-9. Firebase remains an external downstream dependency for push notification delivery
-
 ## Region Strategy
 
 For a first production deployment, one primary region is enough.
@@ -134,7 +117,7 @@ The right region should be chosen based on expected users and operational constr
 2. Cloud SQL should be provisioned in a compatible nearby region
 3. Artifact Registry and build settings should align with that deployment region where practical
 
-Multi-region traffic routing can be treated as future work rather than part of the initial deployment plan.
+Multi region traffic routing can be treated as future work rather than part of the initial deployment plan.
 
 ## Architecture Summary
 
