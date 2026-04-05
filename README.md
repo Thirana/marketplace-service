@@ -66,6 +66,13 @@ Swagger is available at `/docs` once the application is running.
 Postman artifacts are available under `docs/postman/`.
 Import `marketplace-service.postman_collection.json` and `marketplace-service.local.postman_environment.json` into Postman if you want a ready made request set for the current API surface.
 
+## Hosted Deployment
+
+This service is also deployed on Railway:
+
+- Base URL: `https://marketplace-service-production-a078.up.railway.app`
+- Hosted Swagger: `https://marketplace-service-production-a078.up.railway.app/docs`
+
 ## Documentation
 
 The `docs/` directory contains the main technical notes:
